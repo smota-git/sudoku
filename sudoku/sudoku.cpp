@@ -230,7 +230,7 @@ void bubblesort(doublevector& vector2D_possibilities, doublevector& vector2D_pos
 /// <summary>
 /// při výběru čísla pro vyplnění dané pozice se zde odpovídající číslo vyškrtává ze seznamu přípustných čísel pro všechny ostatní
 /// pozice nacházející se ve stejném řádku, sloupci a buňce; následně jsou složky příslušných 2D-vektorů, jejichž velikost se vynuluje,
-/// vyloučeny a zbývající složky příslušných 2D-vektorů jsou seřazeny podle velikosti 
+/// vyloučeny 
 /// </summary>
 /// <param name="q">zkoumané číslo</param>
 /// <param name="i">souřadnice řádku (od O)</param>
@@ -290,20 +290,55 @@ void adjust_acceptable_values(int q, int i, int j, doublevector& vector2D_possib
     // nakonec nově konstruované 2D-vektory ztotožníme s původními
     vector2D_possibilities = site_possibilities;
     vector2D_position_indices = site_indices;
-
-    // nakonec uspořádáme
-    bubblesort(vector2D_possibilities, vector2D_position_indices);
 }
 
 /// <summary>
-/// hlavní iterace: vybírá číslo pro vyplnění aktuální pozice a kontroluje, jestli pro danou volbu nedojde k vyškrtnutí některých
-/// složek odpovídajících dosud nevyplněným pozicím z vektoru přípustných číslic (a tedy pro stávající volbu obsazení nevyplněných
-/// pozic úloha nemá řešení); pokud ano, je vybrána jiná číslice (která projde stejným kontrolním mechanizmem), pokud ne, je dané 
-/// rozložení číslic spolu s vektorem přípustných číslic (zmenšeným o číslici aktuálně vybranou) zapsáno do alternativ (pro případ,
-/// že se daná volba nakonec stejně ukáže ve výsledku nevyhovující v některé z dalších iterací); jestliže se všechny přípustné číslice 
-/// odpovídající dané pozici nakonec ukážou být nevyhovující, je z alternativ vyvolán poslední případ, kdy byla číslice pro některou 
-/// z předchozích pozic vybrána z více možností a spolu s rozložením čísel a vektorem přípustných možností odpovídajících této předešlé
-/// situaci je vybrána kombinace parametrů pro další iteraci
+/// další zefektivnění: pro účely zjednodušení na základě zjištěných přípustných číslic hledáme případné pozice, které jako jediné
+/// připouštějí umístění některých číslic v rámci daného řádku, sloupce nebo buňky (tzv. skrytý singl)
+/// </summary>
+/// <param name="layout">zkoumané rozložení číslic</param>
+/// <param name="vector2D_possibilities">vektor přípustných čísel na jednotlivých pozicích</param>
+/// <param name="vector2D_position_indices">souřadnice pozic ve vektoru přípustných čísel</param>
+void find_hidden_singles(int layout[maximal_value][maximal_value], doublevector& vector2D_possibilities,
+    doublevector& vector2D_position_indices) {
+
+    bool new_values = true;
+    while (new_values) {
+        new_values = false;
+        for (int q = 1; q < maximal_value + 1; q++) {
+            for (int i = 0; i < maximal_value; i++) {
+                for (int j = 0; j < maximal_value; j++) {
+
+                    if (layout[i][j] != 0) continue;
+
+                    int position_index = search_position_index(i, j, vector2D_position_indices);
+                    if (find(vector2D_possibilities[position_index].begin(), vector2D_possibilities[position_index].end(), q) == 
+                        vector2D_possibilities[position_index].end()) continue;
+
+                    bool one_in_line = count_in_line(q, i, j, layout, vector2D_possibilities, vector2D_position_indices) == 1;
+                    bool one_in_column = count_in_column(q, i, j, layout, vector2D_possibilities, vector2D_position_indices) == 1;
+                    bool one_in_cell = count_in_cell(q, i, j, layout, vector2D_possibilities, vector2D_position_indices) == 1;
+
+                    if ((one_in_line || one_in_column || one_in_cell) && (size(vector2D_possibilities[position_index]) > 1)) {
+                        vector2D_possibilities[position_index] = { q };
+                        new_values = true;
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// <summary>
+/// hlavní iterace: pro zefektivnění výpočtu jsou na začátku 2D-vektory přípustných číslic seřazeny podle velikosti; funkce dále 
+/// vybírá číslo pro vyplnění aktuální pozice a kontroluje, jestli pro danou volbu nedojde k vyškrtnutí některých složek odpovídajících
+/// dosud nevyplněným pozicím z vektoru přípustných číslic (a tedy pro stávající volbu obsazení nevyplněných pozic úloha nemá řešení);
+/// pokud ano, je vybrána jiná číslice (která projde stejným kontrolním mechanizmem), pokud ne, vyhledáme nejdřív případné skryté singly,
+/// a pokud se tím příznivý případ nenaruší, je dané rozložení číslic spolu s vektorem přípustných číslic (zmenšeným o číslici aktuálně
+/// vybranou) zapsáno do alternativ (pro případ, že se daná volba nakonec stejně ukáže ve výsledku nevyhovující v některé z dalších
+/// iterací); jestliže se všechny přípustné číslice odpovídající dané pozici nakonec ukážou být nevyhovující, je z alternativ vyvolán
+/// poslední případ, kdy byla číslice pro některou z předchozích pozic vybrána z více možností a spolu s rozložením čísel a vektorem
+/// přípustných možností odpovídajících této předešlé situaci je vybrána kombinace parametrů pro další iteraci
 /// </summary>
 /// <param name="tested_layout">zkoumané rozložení číslic</param>
 /// <param name="vector2D_possibilities">vektor přípustných čísel na jednotlivých pozicích</param>
@@ -316,6 +351,9 @@ void main_iteration(int tested_layout[maximal_value][maximal_value], doublevecto
     int& size_of_relevant_alternatives, int previous_tested_layout[maximal_value * maximal_value][maximal_value][maximal_value],
     vector<doublevector>& previous_acceptable_values, vector<doublevector>& previous_indices_order) {
 
+    // uspořádání vektorů přípustných číslic podle velikosti
+    bubblesort(vector2D_possibilities, vector2D_position_indices);
+
     // výběr pozice a číslice
     int newI = vector2D_position_indices[0][0];
     int newJ = vector2D_position_indices[0][1];
@@ -323,11 +361,18 @@ void main_iteration(int tested_layout[maximal_value][maximal_value], doublevecto
 
     // počet dosud nevyplněných pozic
     int missing_values_count = (int)size(vector2D_possibilities);
+ 
     doublevector new_acceptable_values = vector2D_possibilities;
     doublevector new_indices_order = vector2D_position_indices;
 
+    int new_tested_layout[maximal_value][maximal_value];
+    memcpy(new_tested_layout, tested_layout, maximal_value * maximal_value * sizeof(int));
+    new_tested_layout[newI][newJ] = newQ;
+
     // úprava nových parametrů
     adjust_acceptable_values(newQ, newI, newJ, new_acceptable_values, new_indices_order);
+    if (size(new_acceptable_values) == missing_values_count - 1)
+        find_hidden_singles(new_tested_layout, new_acceptable_values, new_indices_order);
 
     // počet nevyplněných pozic se snížil o 1 a tomu musí odpovídat také velikost vektoru s výčtem přípustných pozic pro všechny nevyplněné pozice;
     // pokud se však ukáže, že tento vektor se zmenšil o víc, znamená to, že navíc vymizely všechny přípustné číslice pro některou další, dosud
@@ -355,7 +400,11 @@ void main_iteration(int tested_layout[maximal_value][maximal_value], doublevecto
             new_acceptable_values = vector2D_possibilities;
             new_indices_order = vector2D_position_indices;
 
+            new_tested_layout[newI][newJ] = newQ;
+
             adjust_acceptable_values(newQ, newI, newJ, new_acceptable_values, new_indices_order);
+            if (size(new_acceptable_values) == missing_values_count - 1)
+                find_hidden_singles(new_tested_layout, new_acceptable_values, new_indices_order);
         }
         else break;
     }
@@ -393,7 +442,7 @@ void main_iteration(int tested_layout[maximal_value][maximal_value], doublevecto
             size_of_relevant_alternatives++;
         }
 
-        tested_layout[newI][newJ] = newQ;
+        memcpy(tested_layout, new_tested_layout, maximal_value * maximal_value * sizeof(int));
     }
 
     // vektor přípustných čísel na jednotlivých pozicích se v případě nalezení správné kombinace změnil, tedy do něj uložíme nově nalezené 
@@ -405,9 +454,8 @@ void main_iteration(int tested_layout[maximal_value][maximal_value], doublevecto
 /// <summary>
 /// hlavní blok: ze vstupních hodnot (zadaných ručně nebo z kódu) vytvoří z booleanovských funkcí na začátku kódu 2D-vektory
 /// acceptable_values a indices_order obsahující výčet čísel, které mohou obsadit jednotlivé pozice, toto je ještě následně upraveno
-/// pomocí parametrů one_in_line (resp. one_in_column, one_in_cell), které najdou pozice, které jsou v rámci daného řádku, sloupce
-/// nebo buňky jedinými kandidáty na obsazení nějakým číslem, čímž se výčet ještě o něco zjednoduší; po uspořádání spustím hlavní cyklus, 
-/// který běží tak dlouho, dokud není obsazena poslední pozice (v takovém případě dojde k vymazání veškerých hodnot z vektoru acceptable_values)
+/// hledáním skrytých singlů, čímž se výčet ještě o něco zjednoduší; po uspořádání spustím hlavní cyklus, který běží tak dlouho,
+/// dokud není obsazena poslední pozice (v takovém případě dojde k vymazání veškerých hodnot z vektoru acceptable_values)
 /// </summary>
 /// <returns></returns>
 int main() {
@@ -441,7 +489,7 @@ int main() {
             //int some_layout[maximal_value][maximal_value] = {{0, 0, 0, 1, 0, 4, 0, 0, 0}, {0, 3, 0, 9, 6, 5, 0, 4, 0}, {0, 0, 8, 0, 0, 0, 6, 0, 0}, {5, 8, 0, 0, 0, 0, 0, 1, 3}, {0, 7, 0, 0, 0, 0, 0, 6, 0}, {4, 1, 0, 0, 0, 0, 0, 9, 2}, {0, 0, 7, 0, 0, 0, 4, 0, 0}, {0, 6, 0, 5, 7, 2, 0, 8, 0}, {0, 0, 0, 8, 0, 3, 0, 0, 0} };
         //17
             //int some_layout[maximal_value][maximal_value] = { {0, 0, 0, 8, 0, 1, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 4, 3, 0}, {5, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 7, 0, 8, 0, 0}, {0, 0, 0, 0, 0, 0, 1, 0, 0}, {0, 2, 0, 0, 3, 0, 0, 0, 0}, {6, 0, 0, 0, 0, 0, 0, 7, 5}, {0, 0, 3, 4, 0, 0, 0, 0, 0}, {0, 0, 0, 2, 0, 0, 6, 0, 0} };
-        /*int some_layout[maximal_value][maximal_value] =
+        int some_layout[maximal_value][maximal_value] =
         {   {0, 0, 0, 4, 0, 0, 0, 7, 1},
             {0, 8, 0, 0, 3, 0, 0, 0, 0},
             {0, 0, 0, 0, 0, 0, 0, 0, 0},
@@ -451,7 +499,7 @@ int main() {
             {0, 0, 0, 0, 2, 0, 9, 0, 0},
             {7, 0, 4, 0, 0, 0, 0, 0, 0},
             {1, 0, 0, 0, 0, 0, 0, 0, 0}
-        }; */       //!!! řeší 58 vteřin, 18249 iterací
+        };       
 
         /*
         int some_layout[maximal_value][maximal_value] =
@@ -464,7 +512,7 @@ int main() {
             {0, 0, 0, 0, 6, 3, 0, 5, 0},
             {0, 7, 2, 0, 0, 0, 4, 0, 0},
             {0, 1, 0, 0, 0, 0, 0, 0, 0}
-        };*/ // 4439 iterací
+        };*/ 
 
 
         //18
@@ -481,9 +529,7 @@ int main() {
             {0, 6, 0, 0, 0, 4, 0, 2, 0},
             {9, 0, 0, 0, 0, 0, 0, 0, 5}
         };*/
-
-
-
+        /*
         //23
         int some_layout[maximal_value][maximal_value] =
         { {0, 9, 0, 4, 0, 0, 0, 0, 0},
@@ -495,7 +541,7 @@ int main() {
             {1, 0, 0, 0, 0, 0, 0, 0, 0},
             {0, 0, 0, 0, 2, 0, 0, 0, 8},
             {7, 0, 3, 0, 0, 4, 2, 0, 0}
-        }; /*
+        };*/ /*
             int some_layout[maximal_value][maximal_value] =
         {   {0, 2, 0, 0, 0, 5, 0, 0, 0},
             {0, 1, 5, 0, 0, 0, 0, 0, 0},
@@ -584,33 +630,7 @@ int main() {
 
     // pro účely zjednodušení na základě zjištěných přípustných číslic hledáme případné pozice, které jako jediné připouštějí umístění některých
     // číslic v rámci daného řádku, sloupce nebo buňky
-    bool new_values = true;
-    while (new_values) {
-        new_values = false;
-        for (int q = 1; q < maximal_value + 1; q++) {
-            for (int i = 0; i < maximal_value; i++) {
-                for (int j = 0; j < maximal_value; j++) {
-
-                    if (supplied_layout[i][j] != 0) continue;
-
-                    int position_index = search_position_index(i, j, indices_order);
-                    if (find(acceptable_values[position_index].begin(), acceptable_values[position_index].end(), q) == acceptable_values[position_index].end()) continue;
-
-                    bool one_in_line = count_in_line(q, i, j, supplied_layout, acceptable_values, indices_order) == 1;
-                    bool one_in_column = count_in_column(q, i, j, supplied_layout, acceptable_values, indices_order) == 1;
-                    bool one_in_cell = count_in_cell(q, i, j, supplied_layout, acceptable_values, indices_order) == 1;
-
-                    if ((one_in_line || one_in_column || one_in_cell) && (size(acceptable_values[position_index]) > 1)) {
-                        acceptable_values[position_index] = { q };
-                        new_values = true;
-                    }
-                }
-            }
-        }
-    }
-
-    // uspořádání vektorů přípustných číslic podle velikosti
-    bubblesort(acceptable_values, indices_order);
+    find_hidden_singles(supplied_layout, acceptable_values, indices_order);
 
     vector<doublevector> previous_acceptable_values;
     vector<doublevector> previous_indices_order;
@@ -657,4 +677,8 @@ int main() {
     auto stop = high_resolution_clock::now();
     auto duration = duration_cast<microseconds>(stop - start);
     cout << "Celkový potřebný čas: " << duration.count() / 1000000.0f << " sekund" << endl;
+
+    cin.get();
+
+    return 0;
 }
