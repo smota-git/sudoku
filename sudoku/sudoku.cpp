@@ -1,4 +1,4 @@
-﻿// sudoku-old.cpp : Tento soubor obsahuje funkci main. Provádění programu se tam zahajuje a ukončuje.
+﻿// sudoku.cpp : Tento soubor obsahuje funkci main. Provádění programu se tam zahajuje a ukončuje.
 //
 
 #include <iostream>
@@ -8,328 +8,652 @@
 using namespace std;
 using namespace std::chrono;
 
-const int imax = 8;
+// definice nového typu: potřebný pro záznam přípustných číslic pro každou pozici
+typedef vector<vector<int>> doublevector;
 
-int main_it = 0;
+// určení rozměrů tabulky (nemusí být jen 9x9, ale taky 4x4, 16x16, 25x25 atd. - vždy druhá mocnina nějakého čísla)
+const int sqrt_of_max = 3;
+const int maximal_value = sqrt_of_max * sqrt_of_max;
 
-vector<vector<vector<int>>> previous_acceptable_values;
-vector<vector<vector<int>>> previous_index_order;
-int previous_temp[100][imax + 1][imax + 1];
-int ptemp_size = 0;
+/// <summary>
+/// funkce pro zadání počátečních podmínek (za předpokladu, že nejsou zadány přímo v kódu) 
+/// </summary>
+/// <param name="initial_layout">počáteční rozložení číslic</param>
+void insert_initial_values(int initial_layout[maximal_value][maximal_value]) {
 
-bool test1(int& qa, int& ia, int& ja, int ar[imax + 1][imax + 1]) {
-    for (int m = 0; m < imax + 1; m++) {
-        if ((m == ja) || (ar[ia][m] == 0)) continue;
-        if (qa == ar[ia][m]) return false;
+    cout << "Zadej pocatecni hodnoty:" << endl << endl;
+
+    for (int i = 0; i < maximal_value; i++) {
+        int j;
+        cout << "  i = " << i << ": " << endl << endl;
+        cout << "    Budete zadávat pro konkrétní hodnoty \"j\" (ano/ne)? ";
+        string feedback;
+        while ((feedback != "a") && (feedback != "n") && (feedback != "ano") && (feedback != "ne")) {
+            cin >> feedback;
+        }
+        cout << endl;
+        if ((feedback == "a") || (feedback == "ano")) {
+            while (true) {
+                cout << "    j = ";
+                cin >> j;
+                if ((j < 0) || (j > maximal_value - 1)) break;
+                cout << "    M(" << i << ", " << j << ") = ";
+                cin >> initial_layout[i][j];
+                cout << endl;
+            }
+            cout << endl;
+        }
+    }
+
+    cout << endl;
+}
+
+/// <summary>
+/// funkce pro vyhledání pořadového čísla pozice s danými souřadnicemi pozice v příslušném složeném vektoru
+/// </summary>
+/// <param name="i">souřadnice řádku (od O)</param>
+/// <param name="j">souřadnice sloupce (od O)</param>
+/// <param name="vector2D_position_indices">vektor souřadnic pozic v uspořádaném vektoru přípustných čísel</param>
+/// <returns>pořadové číslo pozice v aktuálním uspořádání</returns>
+int search_position_index(int i, int j, doublevector& vector2D_position_indices) {
+    int k = 0;
+    while ((vector2D_position_indices[k][0] != i) || (vector2D_position_indices[k][1] != j)) k++;
+
+    return k;
+}
+
+/// <summary>
+/// test, zda s ohledem na rozložení číslic v daném ŘÁDKU může daná pozice obsahovat konkrétní číslo
+/// </summary>
+/// <param name="q">zkoumané číslo</param>
+/// <param name="i">souřadnice řádku (od O)</param>
+/// <param name="j">souřadnice sloupce (od O)</param>
+/// <param name="tested_layout">zkoumané rozložení číslic</param>
+/// <returns>true nebo false</returns>
+bool can_be_in_line(int q, int i, int j, int tested_layout[maximal_value][maximal_value]) {
+    for (int m = 0; m < maximal_value; m++) {
+        if ((m == j) || (tested_layout[i][m] == 0)) continue;
+        if (q == tested_layout[i][m]) return false;
     }
     return true;
 }
 
-bool test2(int& qa, int& ia, int& ja, int ar[imax + 1][imax + 1]) {
-    for (int m = 0; m < imax + 1; m++) {
-        if ((m == ia) || (ar[m][ja] == 0)) continue;
-        if (qa == ar[m][ja]) return false;
+/// <summary>
+/// test, zda s ohledem na rozložení číslic v daném SLOUPCI může daná pozice obsahovat konkrétní číslo
+/// </summary>
+/// <param name="q">zkoumané číslo</param>
+/// <param name="i">souřadnice řádku (od O)</param>
+/// <param name="j">souřadnice sloupce (od O)</param>
+/// <param name="tested_layout">zkoumané rozložení číslic</param>
+/// <returns>true nebo false</returns>
+bool can_be_in_column(int q, int i, int j, int tested_layout[maximal_value][maximal_value]) {
+    for (int m = 0; m < maximal_value; m++) {
+        if ((m == i) || (tested_layout[m][j] == 0)) continue;
+        if (q == tested_layout[m][j]) return false;
     }
     return true;
 }
 
-bool test3(int& qa, int& ia, int& ja, int ar[imax + 1][imax + 1]) {
-    int a = int(ia / 3);
-    int b = int(ja / 3);
-    for (int m = 0; m < 3; m++) {
-        for (int n = 0; n < 3; n++) {
-            if (((3 * a + m == ia) && (3 * b + n == ja)) || (ar[3 * a + m][3 * b + n] == 0)) continue;
-            if (qa == ar[3 * a + m][3 * b + n]) return false;
+/// <summary>
+/// test, zda s ohledem na rozložení číslic v dané BUŇCE může daná pozice obsahovat konkrétní číslo
+/// </summary>
+/// <param name="q">zkoumané číslo</param>
+/// <param name="i">souřadnice řádku (od O)</param>
+/// <param name="j">souřadnice sloupce (od O)</param>
+/// <param name="tested_layout">zkoumané rozložení číslic</param>
+/// <returns>true nebo false</returns>
+bool can_be_in_cell(int q, int i, int j, int tested_layout[maximal_value][maximal_value]) {
+    int line_quotient = i / sqrt_of_max * sqrt_of_max;
+    int column_quotient = j / sqrt_of_max * sqrt_of_max;
+    for (int m = 0; m < sqrt_of_max; m++) {
+        for (int n = 0; n < sqrt_of_max; n++) {
+            if (((line_quotient + m == i) && (column_quotient + n == j)) || (tested_layout[line_quotient + m][column_quotient + n] == 0)) continue;
+            if (q == tested_layout[line_quotient + m][column_quotient + n]) return false;
         }
     }
     return true;
 }
 
-void manipulate_vector(vector<vector<int>>& double_vector, int i, int j) {
-    vector<int> double_vector_i = double_vector[i];
-    vector<int> double_vector_j = double_vector[j];
+/// <summary>
+/// zjištění počtu pozic v daném ŘÁDKU, které mohou obsahovat konkrétní  číslo
+/// </summary>
+/// <param name="q">zkoumané číslo</param>
+/// <param name="i">souřadnice řádku (od O)</param>
+/// <param name="j">souřadnice sloupce (od O)</param>
+/// <param name="tested_layout">zkoumané rozložení číslic</param>
+/// <param name="vector2D_possibilities">vektor přípustných čísel na jednotlivých pozicích</param>
+/// <param name="vector2D_position_indices">souřadnice pozic ve vektoru přípustných čísel</param>
+/// <returns>počet pozic s danou vlastností</returns>
+int count_in_line(int q, int i, int j, int tested_layout[maximal_value][maximal_value], doublevector& vector2D_possibilities, doublevector& vector2D_position_indices) {
+    int count = 0;
 
-    double_vector[i] = double_vector_j;
-    double_vector[j] = double_vector_i;
+    for (int m = 0; m < maximal_value; m++) {
+        if (tested_layout[i][m] != 0) continue;
+        int position_index = search_position_index(i, m, vector2D_position_indices);
+        for (int n = 0; n < size(vector2D_possibilities[position_index]); n++) {
+            if (vector2D_possibilities[position_index][n] == q) count++;
+        }
+    }
+    return count;
 }
 
-void bubblesort(vector<vector<int>>& VectorOfVectors1, vector<vector<int>>& VectorOfVectors2) {
-    bool test = true;
-    int i = 0;
-    int length1 = size(VectorOfVectors1);
-    while ((i < length1) && test) {
-        test = false;
-        for (int j = 0; j < length1 - i - 1; j++) {
-            if (size(VectorOfVectors1[j]) > size(VectorOfVectors1[j + 1])) {
-                test = true;
-                manipulate_vector(VectorOfVectors1, j, j + 1);
-                manipulate_vector(VectorOfVectors2, j, j + 1);
+/// <summary>
+/// zjištění počtu pozic v daném SLOUPCI, které mohou obsahovat konkrétní  číslo
+/// </summary>
+/// <param name="q">zkoumané číslo</param>
+/// <param name="i">souřadnice řádku (od O)</param>
+/// <param name="j">souřadnice sloupce (od O)</param>
+/// <param name="tested_layout">zkoumané rozložení číslic</param>
+/// <param name="vector2D_possibilities">vektor přípustných čísel na jednotlivých pozicích</param>
+/// <param name="vector2D_position_indices">souřadnice pozic ve vektoru přípustných čísel</param>
+/// <returns>počet pozic s danou vlastností</returns>
+int count_in_column(int q, int i, int j, int tested_layout[maximal_value][maximal_value], doublevector& vector2D_possibilities, doublevector& vector2D_position_indices) {
+    int count = 0;
+
+    for (int m = 0; m < maximal_value; m++) {
+        if (tested_layout[m][j] != 0) continue;
+        int position_index = search_position_index(m, j, vector2D_position_indices);
+        for (int n = 0; n < size(vector2D_possibilities[position_index]); n++) {
+            if (vector2D_possibilities[position_index][n] == q) count++;
+        }
+    }
+    return count;
+}
+
+
+/// <summary>
+/// zjištění počtu pozic v dané BUŇCE, které mohou obsahovat konkrétní  číslo
+/// </summary>
+/// <param name="q">zkoumané číslo</param>
+/// <param name="i">souřadnice řádku (od O)</param>
+/// <param name="j">souřadnice sloupce (od O)</param>
+/// <param name="tested_layout">zkoumané rozložení číslic</param>
+/// <param name="vector2D_possibilities">vektor přípustných čísel na jednotlivých pozicích</param>
+/// <param name="vector2D_position_indices">souřadnice pozic ve vektoru přípustných čísel</param>
+/// <returns>počet pozic s danou vlastností</returns>
+int count_in_cell(int q, int i, int j, int tested_layout[maximal_value][maximal_value], doublevector& vector2D_possibilities, doublevector& vector2D_position_indices) {
+    int count = 0;
+
+    int line_quotient = i / sqrt_of_max * sqrt_of_max;
+    int column_quotient = j / sqrt_of_max * sqrt_of_max;
+
+    for (int m = 0; m < maximal_value; m++) {
+        int needed_i = line_quotient + (m / sqrt_of_max);
+        int needed_j = column_quotient + m % sqrt_of_max;
+
+        if (tested_layout[needed_i][needed_j] != 0) continue;
+
+        int position_index = search_position_index(needed_i, needed_j, vector2D_position_indices);
+        for (int n = 0; n < size(vector2D_possibilities[position_index]); n++) {
+            if (vector2D_possibilities[position_index][n] == q) count++;
+        }
+    }
+    return count;
+}
+
+/// <summary>
+/// prohození složek 2D-vektorů v rámci bubblesortu
+/// </summary>
+/// <param name="a">pořadové číslo první prohazované pozice</param>
+/// <param name="b">pořadové číslo druhé prohazované pozice</param>
+/// <param name="double_vector">uspořádávaný 2D-vektor</param>
+void interchange_vectors(int a, int b, doublevector& double_vector) {
+    vector<int> double_vector_a = double_vector[a];
+    vector<int> double_vector_b = double_vector[b];
+
+    double_vector[a] = double_vector_b;
+    double_vector[b] = double_vector_a;
+}
+
+/// <summary>
+/// algoritmus bubblesort - uspořádává složky (tvořené vektory) daných 2D-vektorů podle velikosti (počtu prvků obsažených v jednotlivých složkách) 
+/// </summary>
+/// <param name="vector2D_possibilities">vektor přípustných čísel na jednotlivých pozicích</param>
+/// <param name="vector2D_position_indices">souřadnice pozic ve vektoru přípustných čísel</param>
+void bubblesort(doublevector& vector2D_possibilities, doublevector& vector2D_position_indices) {
+    bool unsorted = true;
+    int k = 0;
+    int length_of_vector = (int)size(vector2D_possibilities);
+    while ((k < length_of_vector) && unsorted) {
+        unsorted = false;
+        for (int l = 0; l < length_of_vector - k - 1; l++) {
+            if (size(vector2D_possibilities[l]) > size(vector2D_possibilities[l + 1])) {
+                unsorted = true;
+                interchange_vectors(l, l + 1, vector2D_possibilities);
+                interchange_vectors(l, l + 1, vector2D_position_indices);
             }
         }
-        i++;
+        k++;
     }
 }
 
-void adjust_acceptable_values(vector<vector<int>>& VectorOfVectors1, vector<vector<int>>& VectorOfVectors2, int q, int i, int j) {
-    vector<vector<int>> PomVector1 = {};
-    vector<vector<int>> PomVector2 = {};
+/// <summary>
+/// při výběru čísla pro vyplnění dané pozice se zde odpovídající číslo vyškrtává ze seznamu přípustných čísel pro všechny ostatní
+/// pozice nacházející se ve stejném řádku, sloupci a buňce; následně jsou složky příslušných 2D-vektorů, jejichž velikost se vynuluje,
+/// vyloučeny a zbývající složky příslušných 2D-vektorů jsou seřazeny podle velikosti 
+/// </summary>
+/// <param name="q">zkoumané číslo</param>
+/// <param name="i">souřadnice řádku (od O)</param>
+/// <param name="j">souřadnice sloupce (od O)</param>
+/// <param name="tested_layout">zkoumané rozložení číslic</param>
+/// <param name="vector2D_possibilities">vektor přípustných čísel na jednotlivých pozicích</param>
+/// <param name="vector2D_position_indices">souřadnice pozic ve vektoru přípustných čísel</param>
+void adjust_acceptable_values(int q, int i, int j, doublevector& vector2D_possibilities, doublevector& vector2D_position_indices) {
+    doublevector site_possibilities = {};
+    doublevector site_indices = {};
 
     int k = 0;
 
-    while (k < size(VectorOfVectors1)) {
-        vector<int> TempVector = {};
+    while (k < size(vector2D_possibilities)) {
 
-        for (int l = 1; l < size(VectorOfVectors1[k]); l++)
-            TempVector.push_back(VectorOfVectors1[k][l]);
+        bool site_contribution = true;
 
-        if (find(TempVector.begin(), TempVector.end(), q) != TempVector.end()) {
-            bool condition1 = VectorOfVectors2[k][1] - 1 == i;
-            bool condition2 = VectorOfVectors2[k][2] - 1 == j;
-            bool condition3 = (((VectorOfVectors2[k][1] - 1) / 3 == i / 3) && ((VectorOfVectors2[k][2] - 1) / 3 == j / 3));
+        // nachází se číslo q v seznamu přípustných číslic pro iterovanou pozici?
+        if (find(vector2D_possibilities[k].begin(), vector2D_possibilities[k].end(), q) != vector2D_possibilities[k].end()) {
 
-            if (condition1 || condition2 || condition3) {
-                bool just_filled = condition1 && condition2;
+            // pokud ano, ověříme, zda se zadanou pozicí sdílí řádek, sloupec nebo buňku
+            bool possible_q_in_same_line = vector2D_position_indices[k][0] == i;
+            bool possible_q_in_same_column = vector2D_position_indices[k][1] == j;
+            bool possible_q_in_same_cell = ((vector2D_position_indices[k][0] / sqrt_of_max == i / sqrt_of_max) && (vector2D_position_indices[k][1] / sqrt_of_max == j / sqrt_of_max));
 
-                vector<int>::iterator it = TempVector.begin();
+            if (possible_q_in_same_line || possible_q_in_same_column || possible_q_in_same_cell) {
+                //krajní možnost: iterovaná a zadaná pozice jsou totožné
+                bool just_filled = possible_q_in_same_line && possible_q_in_same_column;
+
+                // výmaz číslice q ze seznamu přípustných možností (to se díky cyklu provede pro každou iterovanou pozici splňující
+                // aspoň jednu z podmínek)
+                vector<int>::iterator it = vector2D_possibilities[k].begin();
                 bool erased = false;
                 while (!erased) {
                     if (*it == q) {
-                        it = TempVector.erase(it);
+                        it = vector2D_possibilities[k].erase(it);
                         erased = true;
                     }
                     else it++;
                 }
 
-                if (size(TempVector) > 0 && (!just_filled)) {
-                    vector<int> rg = { VectorOfVectors1[k][0] };
-                    TempVector.insert(next(TempVector.begin(), 0), rg.cbegin(), rg.cend());
-                    PomVector1.push_back({ TempVector });
-                    PomVector2.push_back(VectorOfVectors2[k]);
-                }
-            }
-            else {
-                vector<int> rg = { VectorOfVectors1[k][0] };
-                TempVector.insert(next(TempVector.begin(), 0), rg.cbegin(), rg.cend());
-                PomVector1.push_back({ TempVector });
-                PomVector2.push_back(VectorOfVectors2[k]);
+                if ((size(vector2D_possibilities[k]) == 0) || just_filled) site_contribution = false;
             }
         }
-        else {
-            vector<int> rg = { VectorOfVectors1[k][0] };
-            TempVector.insert(next(TempVector.begin(), 0), rg.cbegin(), rg.cend());
-            PomVector1.push_back({ TempVector });
-            PomVector2.push_back(VectorOfVectors2[k]);
+
+        // pokud upravený seznam možností pro iterovanou pozici (od původní podoby se liší smazaním čísla q) splňuje dodatečné požadavky 
+        // (nesmí platit, že  se smazáním q eliminují všechny možnosti nebo jsou iterovaná a zadaná pozice totožné, tj. site_contribution = false),
+        // můžeme ho přidat do nově konstruovaného 2D-vektoru možností pro jednotlivé pozice
+        if (site_contribution) {
+            site_possibilities.push_back({ vector2D_possibilities[k] });
+            site_indices.push_back(vector2D_position_indices[k]);
         }
 
         k++;
     }
 
-    VectorOfVectors1 = PomVector1;
-    VectorOfVectors2 = PomVector2;
+    // nakonec nově konstruované 2D-vektory ztotožníme s původními
+    vector2D_possibilities = site_possibilities;
+    vector2D_position_indices = site_indices;
 
-    bubblesort(VectorOfVectors1, VectorOfVectors2);
+    // nakonec uspořádáme
+    bubblesort(vector2D_possibilities, vector2D_position_indices);
 }
 
-void main_iteration(vector<vector<int>>& VectorOfVectors1, vector<vector<int>>& VectorOfVectors2, int ar[imax + 1][imax + 1]) {
-    int newI = VectorOfVectors2[0][1] - 1;
-    int newJ = VectorOfVectors2[0][2] - 1;
+/// <summary>
+/// hlavní iterace: vybírá číslo pro vyplnění aktuální pozice a kontroluje, jestli pro danou volbu nedojde k vyškrtnutí některých
+/// složek odpovídajících dosud nevyplněným pozicím z vektoru přípustných číslic (a tedy pro stávající volbu obsazení nevyplněných
+/// pozic úloha nemá řešení); pokud ano, je vybrána jiná číslice (která projde stejným kontrolním mechanizmem), pokud ne, je dané 
+/// rozložení číslic spolu s vektorem přípustných číslic (zmenšeným o číslici aktuálně vybranou) zapsáno do alternativ (pro případ,
+/// že se daná volba nakonec stejně ukáže ve výsledku nevyhovující v některé z dalších iterací); jestliže se všechny přípustné číslice 
+/// odpovídající dané pozici nakonec ukážou být nevyhovující, je z alternativ vyvolán poslední případ, kdy byla číslice pro některou 
+/// z předchozích pozic vybrána z více možností a spolu s rozložením čísel a vektorem přípustných možností odpovídajících této předešlé
+/// situaci je vybrána kombinace parametrů pro další iteraci
+/// </summary>
+/// <param name="tested_layout">zkoumané rozložení číslic</param>
+/// <param name="vector2D_possibilities">vektor přípustných čísel na jednotlivých pozicích</param>
+/// <param name="vector2D_position_indices">souřadnice pozic ve vektoru přípustných čísel</param>
+/// <param name="size_of_relevant_alternatives">počet pozic připouštějících alternativní kombinace parametrů pro případ, že se dostaneme do sporu</param>
+/// <param name="previous_tested_layout">rozložení číslic odpovídající alternativám</param>
+/// <param name="previous_acceptable_values">přípustné číslice odpovídající alternativám</param>
+/// <param name="previous_indices_order">souřadnice pozic odpovídajících alternativám</param>
+void main_iteration(int tested_layout[maximal_value][maximal_value], doublevector& vector2D_possibilities, doublevector& vector2D_position_indices,
+    int& size_of_relevant_alternatives, int previous_tested_layout[maximal_value * maximal_value][maximal_value][maximal_value],
+    vector<doublevector>& previous_acceptable_values, vector<doublevector>& previous_indices_order) {
 
-    int newQ = VectorOfVectors1[0][1];
+    // výběr pozice a číslice
+    int newI = vector2D_position_indices[0][0];
+    int newJ = vector2D_position_indices[0][1];
+    int newQ = vector2D_possibilities[0][0];
 
-    int empty_values_count = size(VectorOfVectors1);
-    vector<vector<int>> new_acceptable_values = VectorOfVectors1;
-    vector<vector<int>> new_index_order = VectorOfVectors2;
+    // počet dosud nevyplněných pozic
+    int missing_values_count = (int)size(vector2D_possibilities);
+    doublevector new_acceptable_values = vector2D_possibilities;
+    doublevector new_indices_order = vector2D_position_indices;
 
-    adjust_acceptable_values(new_acceptable_values, new_index_order, newQ, newI, newJ);
+    // úprava nových parametrů
+    adjust_acceptable_values(newQ, newI, newJ, new_acceptable_values, new_indices_order);
 
-    bool contradiction = false;
+    // počet nevyplněných pozic se snížil o 1 a tomu musí odpovídat také velikost vektoru s výčtem přípustných pozic pro všechny nevyplněné pozice;
+    // pokud se však ukáže, že tento vektor se zmenšil o víc, znamená to, že navíc vymizely všechny přípustné číslice pro některou další, dosud
+    // nevyplněnou pozici a naši poslední volbu je tedy třeba modifikovat
+    while (size(new_acceptable_values) < missing_values_count - 1) {
 
-    while ((size(new_acceptable_values) < empty_values_count - 1) && (!contradiction)) {
+        // pro danou pozici smažeme možnost, která se ukázala být nevyhovující
+        cout << "  průchod 1.mazacím blokem" << endl;
 
-        cout << "VALUE CHANGE 1" << endl;
-
-        vector<int>::iterator it = VectorOfVectors1[0].begin();
+        vector<int>::iterator it = vector2D_possibilities[0].begin();
         bool erased = false;
         while (!erased) {
             if (*it == newQ) {
-                VectorOfVectors1[0].erase(it);
+                vector2D_possibilities[0].erase(it);
                 erased = true;
             }
             else it++;
         }
 
-        if (size(VectorOfVectors1[0]) > 1) {
-            newQ = VectorOfVectors1[0][1];
+        // pokud nebyly pro danou pozici vyčerpány všechny možnosti přípustných číslic, vybereme další z nich; v opačném případě zastavíme cyklus -
+        // - je potřeba se vrátit na nejbližší pozici, připouštějící výběr jiné číslice
+        if (size(vector2D_possibilities[0]) > 0) {
+            newQ = vector2D_possibilities[0][0];
 
-            new_acceptable_values = VectorOfVectors1;
-            new_index_order = VectorOfVectors2;
+            new_acceptable_values = vector2D_possibilities;
+            new_indices_order = vector2D_position_indices;
 
-            adjust_acceptable_values(new_acceptable_values, new_index_order, newQ, newI, newJ);
+            adjust_acceptable_values(newQ, newI, newJ, new_acceptable_values, new_indices_order);
         }
-        else {
-
-            cout << "VALUE CHANGE 2" << endl;
-
-            ptemp_size--;
-
-            new_acceptable_values = previous_acceptable_values[ptemp_size];
-            new_index_order = previous_index_order[ptemp_size];
-
-            previous_acceptable_values.pop_back();
-            previous_index_order.pop_back();
-
-            for (int i = 0; i < imax + 1; i++) {
-                for (int j = 0; j < imax + 1; j++) {
-                    ar[i][j] = previous_temp[ptemp_size][i][j];
-                    previous_temp[ptemp_size][i][j] = 0;
-                }
-            }
-
-            contradiction = true;
-        }
+        else break;
     }
 
-    if (!contradiction) {
-        if (size(VectorOfVectors1[0]) > 2) {
-            vector<vector<int>> previous_vector = VectorOfVectors1;
-            vector<int>::iterator it = previous_vector[0].begin() + 1;
+    if (size(vector2D_possibilities[0]) == 0) {
+
+        // vyčerpání všech možností pro danou pozici: vybíráme nejbližší alternativu, kterou po překopírování parametrů ihned
+        // smažeme (abychom si uvolnili přístup k případné další alternativě)
+        cout << "  průchod 2.mazacím blokem" << endl;
+
+        size_of_relevant_alternatives--;
+
+        new_acceptable_values = previous_acceptable_values[size_of_relevant_alternatives];
+        new_indices_order = previous_indices_order[size_of_relevant_alternatives];
+
+        previous_acceptable_values.pop_back();
+        previous_indices_order.pop_back();
+
+        memcpy(tested_layout, previous_tested_layout[size_of_relevant_alternatives], maximal_value * maximal_value * sizeof(int));
+        memset(previous_tested_layout[size_of_relevant_alternatives], 0, maximal_value * maximal_value * sizeof(int));
+    }
+    else {
+
+        // správná konfigurace parametrů nalezena: pokud se pro danou pozici nejedná o poslední přípustnou číslici, odmažeme ze seznamu pro ni 
+        // přípustných číslic aktuální hodnotu a vzniklou kombinaci parametrů uložíme do seznamu alternativ
+        if (size(vector2D_possibilities[0]) > 1) {
+            doublevector previous_vector = vector2D_possibilities;
+            vector<int>::iterator it = previous_vector[0].begin();
             previous_vector[0].erase(it);
             previous_acceptable_values.push_back(previous_vector);
-            previous_index_order.push_back(VectorOfVectors2);
+            previous_indices_order.push_back(vector2D_position_indices);
 
-            for (int i = 0; i < imax + 1; i++) {
-                for (int j = 0; j < imax + 1; j++) {
-                    previous_temp[ptemp_size][i][j] = ar[i][j];
-                }
-            }
-            ptemp_size++;
+            memcpy(previous_tested_layout[size_of_relevant_alternatives], tested_layout, maximal_value * maximal_value * sizeof(int));
+
+            size_of_relevant_alternatives++;
         }
 
-        ar[newI][newJ] = newQ;
+        tested_layout[newI][newJ] = newQ;
     }
 
-    VectorOfVectors1 = new_acceptable_values;
-    VectorOfVectors2 = new_index_order;
+    // vektor přípustných čísel na jednotlivých pozicích se v případě nalezení správné kombinace změnil, tedy do něj uložíme nově nalezené 
+    // (a upravené) schéma
+    vector2D_possibilities = new_acceptable_values;
+    vector2D_position_indices = new_indices_order;
 }
 
+/// <summary>
+/// hlavní blok: ze vstupních hodnot (zadaných ručně nebo z kódu) vytvoří z booleanovských funkcí na začátku kódu 2D-vektory
+/// acceptable_values a indices_order obsahující výčet čísel, které mohou obsadit jednotlivé pozice, toto je ještě následně upraveno
+/// pomocí parametrů one_in_line (resp. one_in_column, one_in_cell), které najdou pozice, které jsou v rámci daného řádku, sloupce
+/// nebo buňky jedinými kandidáty na obsazení nějakým číslem, čímž se výčet ještě o něco zjednoduší; po uspořádání spustím hlavní cyklus, 
+/// který běží tak dlouho, dokud není obsazena poslední pozice (v takovém případě dojde k vymazání veškerých hodnot z vektoru acceptable_values)
+/// </summary>
+/// <returns></returns>
 int main() {
 
     locale loc("czech");
     locale::global(loc);
 
+    int initial_layout[maximal_value][maximal_value];
+
+    string manual_entry = "0";
+
+    cout << "Budete počáteční hodnoty zadávat  ručně (ano/ne)? ";
+
+    while ((manual_entry != "a") && (manual_entry != "n") && (manual_entry != "ano") && (manual_entry != "ne")) {
+        cin >> manual_entry;
+    }
+
+    cout << endl;
+
+    if ((manual_entry == "a") || (manual_entry == "ano")) {
+        memset(initial_layout, 0, maximal_value * maximal_value * sizeof(int));
+        insert_initial_values(initial_layout);
+    }
+    else {
+
+        //41 
+            //int some_layout[maximal_value][maximal_value] = { {3, 0, 0, 8, 0, 9, 0, 0, 7}, {0, 0, 1, 4, 0, 3, 6, 0, 0}, {0, 5, 0, 1, 2, 6, 0, 3, 0}, {6, 9, 5, 0, 0, 0, 8, 2, 1}, {0, 0, 7, 0, 0, 0, 9, 0, 0}, {2, 1, 3, 0, 0, 0, 7, 5, 4}, {0, 4, 0, 2, 3, 5, 0, 7, 0}, {0, 0, 6, 7, 0, 4, 5, 0, 0}, {5, 0, 0, 6, 0, 1, 0, 0, 9} };
+        //27 
+            //int some_layout[maximal_value][maximal_value] = {{0, 0, 3, 0, 0, 0, 2, 0, 0}, { 0, 0, 0, 4, 0, 2, 0, 0, 0}, { 2, 0, 0, 3, 5, 9, 0, 0, 6}, { 0, 3, 7, 0, 0, 0, 4, 2, 0}, { 0, 0, 2, 0, 7, 0, 6, 0, 0}, { 0, 1, 8, 0, 0, 0, 3, 5, 0}, { 3, 0, 0, 9, 4, 6, 0, 0, 5}, {0, 0, 0, 7, 0, 8, 0, 0, 0}, {0, 0, 9, 0, 0, 0, 1, 0, 0}};
+            //int some_layout[maximal_value][maximal_value] = {{1, 0, 0, 6, 0, 4, 0, 0, 2}, {0, 0, 0, 0, 5, 0, 0, 0, 0}, {0, 0, 9, 3, 0, 7, 1, 0, 0}, {7, 0, 1, 0, 0, 0, 2, 0, 6}, {0, 5, 0, 0, 1, 0, 0, 8, 0}, {8, 0, 2, 0, 0, 0, 4, 0, 3}, {0, 0, 6, 5, 0, 8, 7, 0, 0}, {0, 0, 0, 0, 6, 0, 0, 0, 0}, {3, 0, 0, 4, 0, 1, 0, 0, 8} };
+            //int some_layout[maximal_value][maximal_value] = {{0, 0, 0, 1, 0, 4, 0, 0, 0}, {0, 3, 0, 9, 6, 5, 0, 4, 0}, {0, 0, 8, 0, 0, 0, 6, 0, 0}, {5, 8, 0, 0, 0, 0, 0, 1, 3}, {0, 7, 0, 0, 0, 0, 0, 6, 0}, {4, 1, 0, 0, 0, 0, 0, 9, 2}, {0, 0, 7, 0, 0, 0, 4, 0, 0}, {0, 6, 0, 5, 7, 2, 0, 8, 0}, {0, 0, 0, 8, 0, 3, 0, 0, 0} };
+        //17
+            //int some_layout[maximal_value][maximal_value] = { {0, 0, 0, 8, 0, 1, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 4, 3, 0}, {5, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 7, 0, 8, 0, 0}, {0, 0, 0, 0, 0, 0, 1, 0, 0}, {0, 2, 0, 0, 3, 0, 0, 0, 0}, {6, 0, 0, 0, 0, 0, 0, 7, 5}, {0, 0, 3, 4, 0, 0, 0, 0, 0}, {0, 0, 0, 2, 0, 0, 6, 0, 0} };
+        /*int some_layout[maximal_value][maximal_value] =
+        {   {0, 0, 0, 4, 0, 0, 0, 7, 1},
+            {0, 8, 0, 0, 3, 0, 0, 0, 0},
+            {0, 0, 0, 0, 0, 0, 0, 0, 0},
+            {5, 0, 0, 1, 0, 4, 0, 0, 0},
+            {0, 0, 0, 6, 0, 0, 8, 0, 0},
+            {0, 9, 0, 0, 0, 0, 0, 3, 0},
+            {0, 0, 0, 0, 2, 0, 9, 0, 0},
+            {7, 0, 4, 0, 0, 0, 0, 0, 0},
+            {1, 0, 0, 0, 0, 0, 0, 0, 0}
+        }; */       //!!! řeší 58 vteřin, 18249 iterací
+
+        /*
+        int some_layout[maximal_value][maximal_value] =
+        {   {0, 0, 4, 0, 0, 0, 7, 0, 8},
+            {6, 0, 0, 0, 0, 5, 0, 0, 0},
+            {0, 0, 0, 0, 0, 0, 0, 0, 0},
+            {0, 0, 0, 2, 7, 0, 0, 0, 0},
+            {1, 0, 0, 0, 0, 0, 0, 3, 0},
+            {0, 0, 0, 4, 0, 0, 0, 0, 0},
+            {0, 0, 0, 0, 6, 3, 0, 5, 0},
+            {0, 7, 2, 0, 0, 0, 4, 0, 0},
+            {0, 1, 0, 0, 0, 0, 0, 0, 0}
+        };*/ // 4439 iterací
+
+
+        //18
+            //int some_layout[maximal_value][maximal_value] = { {3, 0, 0, 8, 0, 1, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 4, 3, 0}, {5, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 7, 0, 8, 0, 0}, {0, 0, 0, 0, 0, 0, 1, 0, 0}, {0, 2, 0, 0, 3, 0, 0, 0, 0}, {6, 0, 0, 0, 0, 0, 0, 7, 5}, {0, 0, 3, 4, 0, 0, 0, 0, 0}, {0, 0, 0, 2, 0, 0, 6, 0, 0} };
+        //20 
+        /*int some_layout[maximal_value][maximal_value] =
+        {   {5, 0, 0, 0, 0, 0, 0, 0, 9},
+            {0, 2, 0, 1, 0, 0, 0, 7, 0},
+            {0, 0, 8, 0, 0, 0, 3, 0, 0},
+            {0, 4, 0, 0, 0, 2, 0, 0, 0},
+            {0, 0, 0, 0, 5, 0, 0, 0, 0},
+            {0, 0, 0, 7, 0, 6, 0, 1, 0},
+            {0, 0, 3, 0, 0, 0, 8, 0, 0},
+            {0, 6, 0, 0, 0, 4, 0, 2, 0},
+            {9, 0, 0, 0, 0, 0, 0, 0, 5}
+        };*/
+
+
+
+        //23
+        int some_layout[maximal_value][maximal_value] =
+        { {0, 9, 0, 4, 0, 0, 0, 0, 0},
+            {0, 0, 0, 6, 0, 0, 0, 5, 0},
+            {2, 0, 4, 0, 0, 7, 8, 0, 0},
+            {0, 8, 0, 0, 0, 9, 0, 0, 0},
+            {3, 0, 9, 7, 0, 0, 0, 0, 6},
+            {0, 1, 0, 0, 0, 0, 3, 0, 0},
+            {1, 0, 0, 0, 0, 0, 0, 0, 0},
+            {0, 0, 0, 0, 2, 0, 0, 0, 8},
+            {7, 0, 3, 0, 0, 4, 2, 0, 0}
+        }; /*
+            int some_layout[maximal_value][maximal_value] =
+        {   {0, 2, 0, 0, 0, 5, 0, 0, 0},
+            {0, 1, 5, 0, 0, 0, 0, 0, 0},
+            {0, 0, 0, 0, 0, 8, 7, 0, 3},
+            {0, 5, 1, 0, 0, 0, 0, 0, 0},
+            {0, 0, 9, 7, 0, 0, 0, 1, 0},
+            {0, 0, 0, 3, 0, 0, 0, 4, 6},
+            {0, 0, 0, 0, 8, 0, 0, 0, 1},
+            {7, 0, 0, 9, 3, 0, 0, 6, 0},
+            {0, 0, 0, 0, 0, 0, 4, 0, 8}
+        }; */
+        //36
+/*        int some_layout[maximal_value][maximal_value] =
+        {   {0, 1, 7, 8, 6, 0, 9, 0, 0},
+            {0, 0, 6, 0, 0, 4, 2, 0, 7},
+            {0, 5, 0, 0, 7, 0, 1, 6, 8},
+            {6, 2, 0, 0, 0, 8, 0, 7, 9},
+            {0, 0, 8, 0, 4, 0, 6, 2, 0},
+            {5, 0, 0, 6, 0, 0, 0, 8, 0},
+            {0, 6, 0, 0, 8, 0, 0, 1, 0},
+            {7, 0, 2, 3, 0, 0, 8, 0, 6},
+            {0, 0, 0, 0, 0, 6, 0, 9, 0}
+        };
+        */
+
+
+        /*      //0
+                    int some_layout[maximal_value][maximal_value] =
+                    {   {0, 0, 0, 0, 0, 0, 0, 0, 0},
+                        {0, 0, 0, 0, 0, 0, 0, 0, 0},
+                        {0, 0, 0, 0, 0, 0, 0, 0, 0},
+                        {0, 0, 0, 0, 0, 0, 0, 0, 0},
+                        {0, 0, 0, 0, 0, 0, 0, 0, 0},
+                        {0, 0, 0, 0, 0, 0, 0, 0, 0},
+                        {0, 0, 0, 0, 0, 0, 0, 0, 0},
+                        {0, 0, 0, 0, 0, 0, 0, 0, 0},
+                        {0, 0, 0, 0, 0, 0, 0, 0, 0}
+                    };
+          */
+          /*      // varianta 4x4
+                  int some_layout[maximal_value][maximal_value] =
+                  {   {0, 0, 0, 3},
+                      {0, 4, 0, 0},
+                      {0, 0, 3, 2},
+                      {0, 0, 0, 0}
+                  };
+          */
+
+        memcpy(initial_layout, some_layout, maximal_value * maximal_value * sizeof(int));
+    }
+
+    // počáteční podmínky uloženy - zapínáme časovač
     auto start = high_resolution_clock::now();
 
-    //int init[imax + 1][imax + 1] = {};
+    int supplied_layout[maximal_value][maximal_value];
+    memcpy(supplied_layout, initial_layout, maximal_value * maximal_value * sizeof(int));
 
-    /*
-        print("Zadej pocatecni hodnoty:\n\n")
-
-        for i in range(imax + 1) :
-            init[i, 0] = input("  M(" + str(i + 1) + ",1) = ", end = '  ')
-            init[i, 1] = input("  M(" + str(i + 1) + ",2) = ", end = '  ')
-            init[i, 2] = input("  M(" + str(i + 1) + ",3) = ", end = '  ')
-            init[i, 3] = input("  M(" + str(i + 1) + ",4) = ", end = '  ')
-            init[i, 4] = input("  M(" + str(i + 1) + ",5) = ", end = '  ')
-            init[i, 5] = input("  M(" + str(i + 1) + ",6) = ", end = '  ')
-            init[i, 6] = input("  M(" + str(i + 1) + ",7) = ", end = '  ')
-            init[i, 7] = input("  M(" + str(i + 1) + ",8) = ", end = '  ')
-            init[i, 8] = input("  M(" + str(i + 1) + ",9) = ")
-            print("\n\n")
-
-        print("\n\n")
-    */
-
-    //int init[imax + 1][imax + 1] = { {3, 0, 0, 8, 0, 9, 0, 0, 7}, {0, 0, 1, 4, 0, 3, 6, 0, 0}, {0, 5, 0, 1, 2, 6, 0, 3, 0}, {6, 9, 5, 0, 0, 0, 8, 2, 1}, {0, 0, 7, 0, 0, 0, 9, 0, 0}, {2, 1, 3, 0, 0, 0, 7, 5, 4}, {0, 4, 0, 2, 3, 5, 0, 7, 0}, {0, 0, 6, 7, 0, 4, 5, 0, 0}, {5, 0, 0, 6, 0, 1, 0, 0, 9} };
-    //int init[imax + 1][imax + 1] = { {0, 0, 3, 0, 0, 0, 2, 0, 0}, { 0, 0, 0, 4, 0, 2, 0, 0, 0}, { 2, 0, 0, 3, 5, 9, 0, 0, 6}, { 0, 3, 7, 0, 0, 0, 4, 2, 0}, { 0, 0, 2, 0, 7, 0, 6, 0, 0}, { 0, 1, 8, 0, 0, 0, 3, 5, 0}, { 3, 0, 0, 9, 4, 6, 0, 0, 5}, {0, 0, 0, 7, 0, 8, 0, 0, 0}, {0, 0, 9, 0, 0, 0, 1, 0, 0} };
-    //int init[imax + 1][imax + 1] = {{1, 0, 0, 6, 0, 4, 0, 0, 2}, {0, 0, 0, 0, 5, 0, 0, 0, 0}, {0, 0, 9, 3, 0, 7, 1, 0, 0}, {7, 0, 1, 0, 0, 0, 2, 0, 6}, {0, 5, 0, 0, 1, 0, 0, 8, 0}, {8, 0, 2, 0, 0, 0, 4, 0, 3}, {0, 0, 6, 5, 0, 8, 7, 0, 0}, {0, 0, 0, 0, 6, 0, 0, 0, 0}, {3, 0, 0, 4, 0, 1, 0, 0, 8} };
-
-    //int init[imax + 1][imax + 1] = { {0, 0, 0, 8, 0, 1, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 4, 3, 0}, {5, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 7, 0, 8, 0, 0}, {0, 0, 0, 0, 0, 0, 1, 0, 0}, {0, 2, 0, 0, 3, 0, 0, 0, 0}, {6, 0, 0, 0, 0, 0, 0, 7, 5}, {0, 0, 3, 4, 0, 0, 0, 0, 0}, {0, 0, 0, 2, 0, 0, 6, 0, 0} };
-
-    //int init[imax + 1][imax + 1] = { {2, 0, 0, 8, 0, 1, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 4, 3, 0}, {5, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 7, 0, 8, 0, 0}, {0, 0, 0, 0, 0, 0, 1, 0, 0}, {0, 2, 0, 0, 3, 0, 0, 0, 0}, {6, 0, 0, 0, 0, 0, 0, 7, 5}, {0, 0, 3, 4, 0, 0, 0, 0, 0}, {0, 0, 0, 2, 0, 0, 6, 0, 0} };
-
-    int init[imax + 1][imax + 1] = { {0, 0, 0, 4, 0, 0, 0, 7, 1},
-        { 0, 8, 0, 0, 3, 0, 0, 0, 0 },
-        { 0, 0, 0, 0, 0, 0, 0, 0, 0 },
-        { 5, 0, 0, 1, 0, 4, 0, 0, 0 },
-        { 0, 0, 0, 6, 0, 0, 8, 0, 0 },
-        { 0, 9, 0, 0, 0, 0, 0, 3, 0 },
-        { 0, 0, 0, 0, 2, 0, 9, 0, 0 },
-        { 7, 0, 4, 0, 0, 0, 0, 0, 0 },
-        { 1, 0, 0, 0, 0, 0, 0, 0, 0 }
-    }; // řeší 86 sekund pomocí 32575 iterací 
-
-    int temp[imax + 1][imax + 1];
-    memcpy(temp, init, (imax + 1) * (imax + 1) * sizeof(int));
-
-    vector<vector<int>> index_order = {};
-    vector<vector<int>> acceptable_values = {};
+    doublevector indices_order = {};
+    doublevector acceptable_values = {};
 
     int i = -1;
-    int j = 8;
+    int j = maximal_value - 1;
 
-    for (int index = 0; index < (imax + 1) * (imax + 1); index++) {
+
+    // vytváříme vektor přípustných číslic (acceptable values) na základě případné kolize s číslicemi ve stejném řádku, sloupci nebo buňce, plynoucí
+    // z počátečních podmínek
+    for (int site_index = 0; site_index < maximal_value * maximal_value; site_index++) {
         vector<int> acceptable_values_array = {};
-        acceptable_values_array.push_back({ index + 1 });
         j++;
-        if (j == imax + 1) {
+        if (j == maximal_value) {
             j = 0;
             i++;
         }
-        if (temp[i][j] == 0) {
-            int value_position = 0;
-            for (int value_index = 0; value_index < imax + 1; value_index++) {
+        if (supplied_layout[i][j] == 0) {
+            for (int value_index = 0; value_index < maximal_value; value_index++) {
                 int q = value_index + 1;
-                if (test1(q, i, j, temp) && test2(q, i, j, temp) && test3(q, i, j, temp)) {
-                    value_position++;
+                if (can_be_in_line(q, i, j, supplied_layout) && can_be_in_column(q, i, j, supplied_layout) && can_be_in_cell(q, i, j, supplied_layout)) {
                     acceptable_values_array.push_back({ q });
                 }
             }
 
             acceptable_values.push_back(acceptable_values_array);
-            index_order.push_back({ { index + 1, i + 1, j + 1 } });
+            indices_order.push_back({ { i, j } });
         }
     }
 
-    bubblesort(acceptable_values, index_order);
+    // pro účely zjednodušení na základě zjištěných přípustných číslic hledáme případné pozice, které jako jediné připouštějí umístění některých
+    // číslic v rámci daného řádku, sloupce nebo buňky
+    bool new_values = true;
+    while (new_values) {
+        new_values = false;
+        for (int q = 1; q < maximal_value + 1; q++) {
+            for (int i = 0; i < maximal_value; i++) {
+                for (int j = 0; j < maximal_value; j++) {
 
-    while (size(acceptable_values) > 0) {
-        main_it++;
-        cout << main_it << endl;
-        main_iteration(acceptable_values, index_order, temp);
+                    if (supplied_layout[i][j] != 0) continue;
+
+                    int position_index = search_position_index(i, j, indices_order);
+                    if (find(acceptable_values[position_index].begin(), acceptable_values[position_index].end(), q) == acceptable_values[position_index].end()) continue;
+
+                    bool one_in_line = count_in_line(q, i, j, supplied_layout, acceptable_values, indices_order) == 1;
+                    bool one_in_column = count_in_column(q, i, j, supplied_layout, acceptable_values, indices_order) == 1;
+                    bool one_in_cell = count_in_cell(q, i, j, supplied_layout, acceptable_values, indices_order) == 1;
+
+                    if ((one_in_line || one_in_column || one_in_cell) && (size(acceptable_values[position_index]) > 1)) {
+                        acceptable_values[position_index] = { q };
+                        new_values = true;
+                    }
+                }
+            }
+        }
     }
+
+    // uspořádání vektorů přípustných číslic podle velikosti
+    bubblesort(acceptable_values, indices_order);
+
+    vector<doublevector> previous_acceptable_values;
+    vector<doublevector> previous_indices_order;
+
+    int previous_tested_layout[maximal_value * maximal_value][maximal_value][maximal_value];
+    int size_of_relevant_alternatives = 0;
+
+    cout << "Průběh:  " << endl;
+
+    // hlavní cyklus - pro kontrolu složitosti výpočtu počítáme počet průchodů
+    while (size(acceptable_values) > 0) {
+        static int iteration_order = 0;
+        iteration_order++;
+        cout << "  " << iteration_order << ".iterace" << endl;
+        main_iteration(supplied_layout, acceptable_values, indices_order, size_of_relevant_alternatives, previous_tested_layout, previous_acceptable_values,
+            previous_indices_order);
+    }
+
+    cout << endl;
 
     cout << "Počáteční stav: " << endl;
 
-    for (int i = 0; i < imax + 1; i++) {
-        cout << init[i][0] << " ";
-        cout << init[i][1] << " ";
-        cout << init[i][2] << " ";
-        cout << init[i][3] << " ";
-        cout << init[i][4] << " ";
-        cout << init[i][5] << " ";
-        cout << init[i][6] << " ";
-        cout << init[i][7] << " ";
-        cout << init[i][8] << endl;
+    for (int i = 0; i < maximal_value; i++) {
+        for (int j = 0; j < maximal_value; j++) {
+            cout << initial_layout[i][j] << " ";
+        }
+        cout << endl;
     }
 
     cout << endl;
 
     cout << "Koncový stav: " << endl;
 
-    for (int i = 0; i < imax + 1; i++) {
-        cout << temp[i][0] << " ";
-        cout << temp[i][1] << " ";
-        cout << temp[i][2] << " ";
-        cout << temp[i][3] << " ";
-        cout << temp[i][4] << " ";
-        cout << temp[i][5] << " ";
-        cout << temp[i][6] << " ";
-        cout << temp[i][7] << " ";
-        cout << temp[i][8] << endl;
+    for (int i = 0; i < maximal_value; i++) {
+        for (int j = 0; j < maximal_value; j++) {
+            cout << supplied_layout[i][j] << " ";
+        }
+        cout << endl;
     }
 
     cout << endl;
 
+    // vypnutí časovače, změření doby trvání výpočtu
     auto stop = high_resolution_clock::now();
     auto duration = duration_cast<microseconds>(stop - start);
     cout << "Celkový potřebný čas: " << duration.count() / 1000000.0f << " sekund" << endl;
