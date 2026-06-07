@@ -11,7 +11,7 @@ using namespace std::chrono;
 // definition of new type: needed for record of acceptable digits for each iteration
 typedef vector<vector<int>> doublevector;
 
-// determination of size of table (not necessarily only 9x9, but also 4x4, 16x16, 25x25 etc. - always second power of any number)
+// determination of size of table (not necessarily only 9x9, but also 4x4, 16x16, 25x25 etc. - always square of an integer)
 const int sqrt_of_max = 3;
 const int maximal_value = sqrt_of_max * sqrt_of_max;
 
@@ -240,7 +240,7 @@ void bubblesort(doublevector& vector2D_possibilities, doublevector& vector2D_pos
 /// <param name="q">investigated digit</param>
 /// <param name="i">coordinates of the line (from 0)</param>
 /// <param name="j">coordinates of the column (from 0)</param>
-/// <param name="tested_layout">investigated layout of numbersc</param>
+/// <param name="tested_layout">investigated layout of numbers</param>
 /// <param name="vector2D_possibilities">vector of acceptable digits at particular positions</param>
 /// <param name="vector2D_position_indices">coordinates of positions in vector of acceptable digits</param>
 void adjust_acceptable_values(int q, int i, int j, doublevector& vector2D_possibilities, doublevector& vector2D_position_indices) {
@@ -337,9 +337,9 @@ void find_hidden_singles(int layout[maximal_value][maximal_value], doublevector&
 
 /// <summary>
 /// main iteration: for improvement of calculation, initially, the 2D-vectors of acceptable digits are ordered by size; next, the
-/// function chooses the digit for filling the actual position and controlls if for given choice some components corresponding to 
+/// function chooses the digit for filling the actual position and controls if for given choice some components corresponding to 
 /// not yet filled positions from the vector of acceptable digits are not erased (which means that for actual choice of occupation
-///  of unfilled positions the task has no solution); if yes, we choose another digit (which undergoes the same controll mechanism),
+///  of unfilled positions the task has no solution); if yes, we choose another digit (which undergoes the same control mechanism),
 /// if no, we first find possible hidden singles and if this does not corrupt the favorable case, the given digit layout is together 
 /// with vector of acceptable digits (reduced by currently selected digit) added to alternates (this serves for the case that given
 /// choice will not finally appear suitable in any of next iterations); if, finally, all acceptable digits corresponding to given 
@@ -646,7 +646,7 @@ int main() {
 
     cout << "Progress:  " << endl;
 
-    // main cycle - for the controll of complexity of calculation, we calculate the number of passes.
+    // main cycle - for the control of complexity of calculation, we calculate the number of passes.
     while (size(acceptable_values) > 0) {
         static int iteration_order = 0;
         iteration_order++;
