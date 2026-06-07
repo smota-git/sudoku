@@ -40,7 +40,7 @@ void insert_initial_values(int initial_layout[maximal_value][maximal_value]) {
                 cout << "    M(" << i << ", " << j << ") = ";
                 while (true) {
                     cin >> initial_layout[i][j];
-                    if (abs(initial_layout[i][j] - 5) <= 4) break;
+                    if ((initial_layout[i][j] >= 1) && (initial_layout[i][j] <= maximal_value)) break;
                 }
                 cout << endl;
             }
