@@ -32,7 +32,7 @@ void insert_initial_values(int initial_layout[maximal_value][maximal_value]) {
             cin >> feedback;
         }
         if ((feedback == "y") || (feedback == "yes")) {
-            cout << "    \"j\" should be in interval <0,8>, choice of another value causes cancellation of this line (corresponding to given \"i\")" << endl << endl;
+            cout << "    \"j\" should be in interval <0," << maximal_value - 1 << ">, choice of another value causes cancellation of this line (corresponding to given \"i\")" << endl << endl;
             while (true) {
                 cout << "    j = ";
                 cin >> j;
