@@ -16,7 +16,7 @@ const int sqrt_of_max = 3;
 const int maximal_value = sqrt_of_max * sqrt_of_max;
 
 /// <summary>
-/// function for entry of initial conditions (assuming that they are not entered to code directly)
+/// function for reading the initial Sudoku layout (assuming that they are not entered to code directly)
 /// </summary>
 /// <param name="initial_layout">initial layout of digits</param>
 void insert_initial_values(int initial_layout[maximal_value][maximal_value]) {
@@ -26,13 +26,13 @@ void insert_initial_values(int initial_layout[maximal_value][maximal_value]) {
     for (int i = 0; i < maximal_value; i++) {
         int j;
         cout << "  i = " << i << ": " << endl << endl;
-        cout << "    Will you enter for concrete values of \"j\" (yes/no)? ";
+        cout << "    Will you enter for particular values of \"j\" (yes/no)? ";
         string feedback;
         while ((feedback != "y") && (feedback != "n") && (feedback != "yes") && (feedback != "no")) {
             cin >> feedback;
         }
         if ((feedback == "y") || (feedback == "yes")) {
-            cout << "    \"j\" should be in interval <0," << maximal_value - 1 << ">, choice of another value causes cancellation of this line (corresponding to given \"i\")" << endl << endl;
+            cout << "    \"j\" should be in interval <0,8>, choice of another value causes cancellation of this row (corresponding to given \"i\")" << endl << endl;
             while (true) {
                 cout << "    j = ";
                 cin >> j;
@@ -40,7 +40,7 @@ void insert_initial_values(int initial_layout[maximal_value][maximal_value]) {
                 cout << "    M(" << i << ", " << j << ") = ";
                 while (true) {
                     cin >> initial_layout[i][j];
-                    if ((initial_layout[i][j] >= 1) && (initial_layout[i][j] <= maximal_value)) break;
+                    if (abs(initial_layout[i][j] - 5) <= 4) break;
                 }
                 cout << endl;
             }
@@ -53,9 +53,9 @@ void insert_initial_values(int initial_layout[maximal_value][maximal_value]) {
 }
 
 /// <summary>
-/// function for searching of order number of position with given coordinates of position in corresponding composite vector
+/// function for searching the index of a position with the specified coordinates in corresponding composite vector
 /// </summary>
-/// <param name="i">coordinates of line (from 0)</param>
+/// <param name="i">coordinates of row (from 0)</param>
 /// <param name="j">coordinates of column (from 0)</param>
 /// <param name="vector2D_position_indices">vector of coordinates of positions in ordered vector of acceptable digits</param>
 /// <returns>order number of position in current ordering</returns>
@@ -67,14 +67,14 @@ int search_position_index(int i, int j, doublevector& vector2D_position_indices)
 }
 
 /// <summary>
-/// test if regarding the digits ordering in given LINE the given position can include a concrete digit 
+/// test whether the specified digit can be placed at the given position with respect to the current ROW 
 /// </summary>
 /// <param name="q">investigated digit</param>
-/// <param name="i">coordinates of line (from 0)</param>
+/// <param name="i">coordinates of row (from 0)</param>
 /// <param name="j">coordinates of column (from 0)</param>
 /// <param name="tested_layout">investigated layout of digits</param>
 /// <returns>true or false</returns>
-bool can_be_in_line(int q, int i, int j, int tested_layout[maximal_value][maximal_value]) {
+bool can_be_in_row(int q, int i, int j, int tested_layout[maximal_value][maximal_value]) {
     for (int m = 0; m < maximal_value; m++) {
         if ((m == j) || (tested_layout[i][m] == 0)) continue;
         if (q == tested_layout[i][m]) return false;
@@ -83,10 +83,10 @@ bool can_be_in_line(int q, int i, int j, int tested_layout[maximal_value][maxima
 }
 
 /// <summary>
-/// test if regarding the digits ordering in given COLUMN the given position can include a concrete digit 
+/// test whether the specified digit can be placed at the given position with respect to the current COLUMN 
 /// </summary>
 /// <param name="q">investigated digit</param>
-/// <param name="i">coordinates of line (from 0)</param>
+/// <param name="i">coordinates of row (from 0)</param>
 /// <param name="j">coordinates of column (from 0)</param>
 /// <param name="tested_layout">investigated layout of digits</param>
 /// <returns>true or false</returns>
@@ -99,36 +99,36 @@ bool can_be_in_column(int q, int i, int j, int tested_layout[maximal_value][maxi
 }
 
 /// <summary>
-/// test if regarding the digits ordering in given CELL the given position can include a concrete digit 
+/// test whether the specified digit can be placed at the given position with respect to the current SUBGRID
 /// </summary>
 /// <param name="q">investigated digit</param>
-/// <param name="i">coordinates of line (from 0)</param>
+/// <param name="i">coordinates of row (from 0)</param>
 /// <param name="j">coordinates of column (from 0)</param>
 /// <param name="tested_layout">investigated layout of digits</param>
 /// <returns>true or false</returns>
-bool can_be_in_cell(int q, int i, int j, int tested_layout[maximal_value][maximal_value]) {
-    int line_quotient = i / sqrt_of_max * sqrt_of_max;
+bool can_be_in_subgrid(int q, int i, int j, int tested_layout[maximal_value][maximal_value]) {
+    int row_quotient = i / sqrt_of_max * sqrt_of_max;
     int column_quotient = j / sqrt_of_max * sqrt_of_max;
     for (int m = 0; m < sqrt_of_max; m++) {
         for (int n = 0; n < sqrt_of_max; n++) {
-            if (((line_quotient + m == i) && (column_quotient + n == j)) || (tested_layout[line_quotient + m][column_quotient + n] == 0)) continue;
-            if (q == tested_layout[line_quotient + m][column_quotient + n]) return false;
+            if (((row_quotient + m == i) && (column_quotient + n == j)) || (tested_layout[row_quotient + m][column_quotient + n] == 0)) continue;
+            if (q == tested_layout[row_quotient + m][column_quotient + n]) return false;
         }
     }
     return true;
 }
 
 /// <summary>
-/// counting of number of positions in given LINE which can include a concrete digit
+/// counts the positions in given ROW which can contain the specified digit
 /// </summary>
 /// <param name="q">investigated digit</param>
-/// <param name="i">coordinates of line (from 0)</param>
+/// <param name="i">coordinates of row (from 0)</param>
 /// <param name="j">coordinates of column (from 0)</param>
 /// <param name="tested_layout">investigated layout of digits</param>
 /// <param name="vector2D_possibilities">vector of acceptable digits at particular positions</param>
 /// <param name="vector2D_position_indices">coordinates of positions in vector of acceptable digits</param>
 /// <returns>number of positions with given property</returns>
-int count_in_line(int q, int i, int j, int tested_layout[maximal_value][maximal_value], doublevector& vector2D_possibilities, doublevector& vector2D_position_indices) {
+int count_in_row(int q, int i, int j, int tested_layout[maximal_value][maximal_value], doublevector& vector2D_possibilities, doublevector& vector2D_position_indices) {
     int count = 0;
 
     for (int m = 0; m < maximal_value; m++) {
@@ -142,10 +142,10 @@ int count_in_line(int q, int i, int j, int tested_layout[maximal_value][maximal_
 }
 
 /// <summary>
-/// counting of number of positions in given COLUMN which can include a concrete digit
+/// counts the positions in specified COLUMN which can contain the specified digit
 /// </summary>
 /// <param name="q">investigated digit</param>
-/// <param name="i">coordinates of line (from 0)</param>
+/// <param name="i">coordinates of row (from 0)</param>
 /// <param name="j">coordinates of column (from 0)</param>
 /// <param name="tested_layout">investigated layout of digits</param>
 /// <param name="vector2D_possibilities">vector of acceptable digits at particular positions</param>
@@ -165,23 +165,23 @@ int count_in_column(int q, int i, int j, int tested_layout[maximal_value][maxima
 }
 
 /// <summary>
-/// counting of number of positions in given CELL which can include a concrete digit
+/// counts the positions in specified SUBGRID which can contain the specified digit
 /// </summary>
 /// <param name="q">investigated digit</param>
-/// <param name="i">coordinates of line (from 0)</param>
+/// <param name="i">coordinates of row (from 0)</param>
 /// <param name="j">coordinates of column (from 0)</param>
 /// <param name="tested_layout">investigated layout of digits</param>
 /// <param name="vector2D_possibilities">vector of acceptable digits at particular positions</param>
 /// <param name="vector2D_position_indices">coordinates of positions in vector of acceptable digits</param>
 /// <returns>number of positions with given property</returns>
-int count_in_cell(int q, int i, int j, int tested_layout[maximal_value][maximal_value], doublevector& vector2D_possibilities, doublevector& vector2D_position_indices) {
+int count_in_subgrid(int q, int i, int j, int tested_layout[maximal_value][maximal_value], doublevector& vector2D_possibilities, doublevector& vector2D_position_indices) {
     int count = 0;
 
-    int line_quotient = i / sqrt_of_max * sqrt_of_max;
+    int row_quotient = i / sqrt_of_max * sqrt_of_max;
     int column_quotient = j / sqrt_of_max * sqrt_of_max;
 
     for (int m = 0; m < maximal_value; m++) {
-        int needed_i = line_quotient + (m / sqrt_of_max);
+        int needed_i = row_quotient + (m / sqrt_of_max);
         int needed_j = column_quotient + m % sqrt_of_max;
 
         if (tested_layout[needed_i][needed_j] != 0) continue;
@@ -196,12 +196,12 @@ int count_in_cell(int q, int i, int j, int tested_layout[maximal_value][maximal_
 
 
 /// <summary>
-/// interchange of components of 2D-vectors within bubblesort algorithm
+/// swap components of 2D-vectors within bubble sort algorithm
 /// </summary>
-/// <param name="a">order number of first interchanging position</param>
-/// <param name="b">order number of second interchanging position</param>
+/// <param name="a">order number of first swapped position</param>
+/// <param name="b">order number of second swapped position</param>
 /// <param name="double_vector">sorting 2D-vector</param>
-void interchange_vectors(int a, int b, doublevector& double_vector) {
+void swap_vectors(int a, int b, doublevector& double_vector) {
     vector<int> double_vector_a = double_vector[a];
     vector<int> double_vector_b = double_vector[b];
 
@@ -211,7 +211,7 @@ void interchange_vectors(int a, int b, doublevector& double_vector) {
 }
 
 /// <summary>
-/// algorithm bubblesort - it orders components (created by vectors) of given 2D-vectors according to the size (number of digits included in particular components) 
+/// bubble sort algorithm - it orders components (created by vectors) of given 2D-vectors according to the size (number of digits included in particular components) 
 /// </summary>
 /// <param name="vector2D_possibilities">vector of acceptable digits at particular positions</param>
 /// <param name="vector2D_position_indices">coordinates of positions in vector of acceptable digits</param>
@@ -224,8 +224,8 @@ void bubblesort(doublevector& vector2D_possibilities, doublevector& vector2D_pos
         for (int l = 0; l < length_of_vector - k - 1; l++) {
             if (size(vector2D_possibilities[l]) > size(vector2D_possibilities[l + 1])) {
                 unsorted = true;
-                interchange_vectors(l, l + 1, vector2D_possibilities);
-                interchange_vectors(l, l + 1, vector2D_position_indices);
+                swap_vectors(l, l + 1, vector2D_possibilities);
+                swap_vectors(l, l + 1, vector2D_position_indices);
             }
         }
         k++;
@@ -234,11 +234,11 @@ void bubblesort(doublevector& vector2D_possibilities, doublevector& vector2D_pos
 
 /// <summary>
 /// during choice of digit for given position the corresponding number is erased here from list of acceptable digits for all other 
-/// positions located in the same line, column and cell; after that the components of corresponding 2D-vectors whose size is eliminated
+/// positions located in the same row, column and subgrid; after that the components of corresponding 2D-vectors whose size is eliminated
 /// are excluded
 /// </summary>
 /// <param name="q">investigated digit</param>
-/// <param name="i">coordinates of the line (from 0)</param>
+/// <param name="i">coordinates of the row (from 0)</param>
 /// <param name="j">coordinates of the column (from 0)</param>
 /// <param name="tested_layout">investigated layout of numbers</param>
 /// <param name="vector2D_possibilities">vector of acceptable digits at particular positions</param>
@@ -256,14 +256,14 @@ void adjust_acceptable_values(int q, int i, int j, doublevector& vector2D_possib
         // is the number q located in list of acceptable digits for iterated position?
         if (find(vector2D_possibilities[k].begin(), vector2D_possibilities[k].end(), q) != vector2D_possibilities[k].end()) {
 
-            // if yes we verify if the iterated position shares with specified position line, column or cell
-            bool possible_q_in_same_line = vector2D_position_indices[k][0] == i;
+            // if yes we verify if the iterated position shares with specified position row, column or subgrid
+            bool possible_q_in_same_row = vector2D_position_indices[k][0] == i;
             bool possible_q_in_same_column = vector2D_position_indices[k][1] == j;
-            bool possible_q_in_same_cell = ((vector2D_position_indices[k][0] / sqrt_of_max == i / sqrt_of_max) && (vector2D_position_indices[k][1] / sqrt_of_max == j / sqrt_of_max));
+            bool possible_q_in_same_subgrid = ((vector2D_position_indices[k][0] / sqrt_of_max == i / sqrt_of_max) && (vector2D_position_indices[k][1] / sqrt_of_max == j / sqrt_of_max));
 
-            if (possible_q_in_same_line || possible_q_in_same_column || possible_q_in_same_cell) {
+            if (possible_q_in_same_row || possible_q_in_same_column || possible_q_in_same_subgrid) {
                 // limiting possibility: iterated and specified position are the same
-                bool just_filled = possible_q_in_same_line && possible_q_in_same_column;
+                bool just_filled = possible_q_in_same_row && possible_q_in_same_column;
 
                 // deletion of digit q from the list of acceptable possibilities (due to cycle, it is performed for each iterated
                 // position satisfying at least one condition)
@@ -300,7 +300,7 @@ void adjust_acceptable_values(int q, int i, int j, doublevector& vector2D_possib
 
 /// <summary>
 /// next improvement: for the purpose of simplification on the base of found acceptable digits we search possible positions which
-/// are the only admitting location of some digits within given line, column or cell (so-called hidden single)
+/// are the only admitting location of some digits within given row, column or subgrid (so-called hidden single)
 /// </summary>
 /// <param name="layout">investigated number layout</param>
 /// <param name="vector2D_possibilities">vector of acceptable digits at particular positions</param>
@@ -321,11 +321,11 @@ void find_hidden_singles(int layout[maximal_value][maximal_value], doublevector&
                     if (find(vector2D_possibilities[position_index].begin(), vector2D_possibilities[position_index].end(), q) ==
                         vector2D_possibilities[position_index].end()) continue;
 
-                    bool one_in_line = count_in_line(q, i, j, layout, vector2D_possibilities, vector2D_position_indices) == 1;
+                    bool one_in_row = count_in_row(q, i, j, layout, vector2D_possibilities, vector2D_position_indices) == 1;
                     bool one_in_column = count_in_column(q, i, j, layout, vector2D_possibilities, vector2D_position_indices) == 1;
-                    bool one_in_cell = count_in_cell(q, i, j, layout, vector2D_possibilities, vector2D_position_indices) == 1;
+                    bool one_in_subgrid = count_in_subgrid(q, i, j, layout, vector2D_possibilities, vector2D_position_indices) == 1;
 
-                    if ((one_in_line || one_in_column || one_in_cell) && (size(vector2D_possibilities[position_index]) > 1)) {
+                    if ((one_in_row || one_in_column || one_in_subgrid) && (size(vector2D_possibilities[position_index]) > 1)) {
                         vector2D_possibilities[position_index] = { q };
                         new_values = true;
                     }
@@ -338,8 +338,8 @@ void find_hidden_singles(int layout[maximal_value][maximal_value], doublevector&
 /// <summary>
 /// main iteration: for improvement of calculation, initially, the 2D-vectors of acceptable digits are ordered by size; next, the
 /// function chooses the digit for filling the actual position and controls if for given choice some components corresponding to 
-/// not yet filled positions from the vector of acceptable digits are not erased (which means that for actual choice of occupation
-///  of unfilled positions the task has no solution); if yes, we choose another digit (which undergoes the same control mechanism),
+/// not yet filled positions from the vector of acceptable digits are not erased (which means that for actual choice of filling the
+///  remaining positions the task has no solution); if yes, we choose another digit (which undergoes the same control mechanism),
 /// if no, we first find possible hidden singles and if this does not corrupt the favorable case, the given digit layout is together 
 /// with vector of acceptable digits (reduced by currently selected digit) added to alternates (this serves for the case that given
 /// choice will not finally appear suitable in any of next iterations); if, finally, all acceptable digits corresponding to given 
@@ -418,7 +418,7 @@ void main_iteration(int tested_layout[maximal_value][maximal_value], doublevecto
 
     if (size(vector2D_possibilities[0]) == 0) {
 
-        // exhaustion of all possibilities for given position: we choose the closes alternate which we erase just after copying
+        // exhaustion of all possibilities for given position: we choose the closest alternate which we erase just after copying
         // of all parameters (so that we release access to possible another alternate)
         cout << "  passing 2.erasing block" << endl;
 
@@ -612,7 +612,7 @@ int main() {
     int j = maximal_value - 1;
 
 
-    // we create the vector of acceptable values on the base of possible collision with digits in the same line, column or cell,
+    // we create the vector of acceptable values on the base of possible collision with digits in the same row, column or subgrid,
     // following from initial conditions
     for (int site_index = 0; site_index < maximal_value * maximal_value; site_index++) {
         vector<int> acceptable_values_array = {};
@@ -624,7 +624,7 @@ int main() {
         if (supplied_layout[i][j] == 0) {
             for (int value_index = 0; value_index < maximal_value; value_index++) {
                 int q = value_index + 1;
-                if (can_be_in_line(q, i, j, supplied_layout) && can_be_in_column(q, i, j, supplied_layout) && can_be_in_cell(q, i, j, supplied_layout)) {
+                if (can_be_in_row(q, i, j, supplied_layout) && can_be_in_column(q, i, j, supplied_layout) && can_be_in_subgrid(q, i, j, supplied_layout)) {
                     acceptable_values_array.push_back({ q });
                 }
             }
@@ -635,7 +635,7 @@ int main() {
     }
 
     // for the purpose of simplification on the base of found acceptable digits we find possible positions which are the only admitting
-    // placement of some digits within given line, column or cell
+    // placement of some digits within given row, column or subgrid
     find_hidden_singles(supplied_layout, acceptable_values, indices_order);
 
     vector<doublevector> previous_acceptable_values;
