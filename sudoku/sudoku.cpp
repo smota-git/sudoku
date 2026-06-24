@@ -302,7 +302,7 @@ void adjust_acceptable_values(int q, int i, int j, doublevector& vector2D_possib
 /// next improvement: for the purpose of simplification on the base of found candidates we search possible positions which
 /// are the only admitting location of some digits within given row, column or subgrid (so-called hidden single)
 /// </summary>
-/// <param name="layout">investigated number layout</param>
+/// <param name="layout">investigated layout of digits</param>
 /// <param name="vector2D_possibilities">vector of candidates at particular positions</param>
 /// <param name="vector2D_position_indices">coordinates of positions in vector of candidates</param>
 void find_hidden_singles(int layout[maximal_value][maximal_value], doublevector& vector2D_possibilities,
