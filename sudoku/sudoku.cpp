@@ -8,7 +8,7 @@
 using namespace std;
 using namespace std::chrono;
 
-// definition of new type: needed for record of acceptable digits for each iteration
+// definition of new type: needed for record of candidates for each iteration
 typedef vector<vector<int>> doublevector;
 
 // determination of size of table (not necessarily only 9x9, but also 4x4, 16x16, 25x25 etc. - always square of an integer)
@@ -57,7 +57,7 @@ void insert_initial_values(int initial_layout[maximal_value][maximal_value]) {
 /// </summary>
 /// <param name="i">coordinates of row (from 0)</param>
 /// <param name="j">coordinates of column (from 0)</param>
-/// <param name="vector2D_position_indices">vector of coordinates of positions in ordered vector of acceptable digits</param>
+/// <param name="vector2D_position_indices">vector of coordinates of positions in ordered vector of candidates</param>
 /// <returns>order number of position in current ordering</returns>
 int search_position_index(int i, int j, doublevector& vector2D_position_indices) {
     int k = 0;
@@ -125,8 +125,8 @@ bool can_be_in_subgrid(int q, int i, int j, int tested_layout[maximal_value][max
 /// <param name="i">coordinates of row (from 0)</param>
 /// <param name="j">coordinates of column (from 0)</param>
 /// <param name="tested_layout">investigated layout of digits</param>
-/// <param name="vector2D_possibilities">vector of acceptable digits at particular positions</param>
-/// <param name="vector2D_position_indices">coordinates of positions in vector of acceptable digits</param>
+/// <param name="vector2D_possibilities">vector of candidates at particular positions</param>
+/// <param name="vector2D_position_indices">coordinates of positions in vector of candidates</param>
 /// <returns>number of positions with given property</returns>
 int count_in_row(int q, int i, int j, int tested_layout[maximal_value][maximal_value], doublevector& vector2D_possibilities, doublevector& vector2D_position_indices) {
     int count = 0;
@@ -148,8 +148,8 @@ int count_in_row(int q, int i, int j, int tested_layout[maximal_value][maximal_v
 /// <param name="i">coordinates of row (from 0)</param>
 /// <param name="j">coordinates of column (from 0)</param>
 /// <param name="tested_layout">investigated layout of digits</param>
-/// <param name="vector2D_possibilities">vector of acceptable digits at particular positions</param>
-/// <param name="vector2D_position_indices">coordinates of positions in vector of acceptable digits</param>
+/// <param name="vector2D_possibilities">vector of candidates at particular positions</param>
+/// <param name="vector2D_position_indices">coordinates of positions in vector of candidates</param>
 /// <returns>number of positions with given property</returns>
 int count_in_column(int q, int i, int j, int tested_layout[maximal_value][maximal_value], doublevector& vector2D_possibilities, doublevector& vector2D_position_indices) {
     int count = 0;
@@ -171,8 +171,8 @@ int count_in_column(int q, int i, int j, int tested_layout[maximal_value][maxima
 /// <param name="i">coordinates of row (from 0)</param>
 /// <param name="j">coordinates of column (from 0)</param>
 /// <param name="tested_layout">investigated layout of digits</param>
-/// <param name="vector2D_possibilities">vector of acceptable digits at particular positions</param>
-/// <param name="vector2D_position_indices">coordinates of positions in vector of acceptable digits</param>
+/// <param name="vector2D_possibilities">vector of candidates at particular positions</param>
+/// <param name="vector2D_position_indices">coordinates of positions in vector of candidates</param>
 /// <returns>number of positions with given property</returns>
 int count_in_subgrid(int q, int i, int j, int tested_layout[maximal_value][maximal_value], doublevector& vector2D_possibilities, doublevector& vector2D_position_indices) {
     int count = 0;
@@ -213,8 +213,8 @@ void swap_vectors(int a, int b, doublevector& double_vector) {
 /// <summary>
 /// bubble sort algorithm - it orders components (created by vectors) of given 2D-vectors according to the size (number of digits included in particular components) 
 /// </summary>
-/// <param name="vector2D_possibilities">vector of acceptable digits at particular positions</param>
-/// <param name="vector2D_position_indices">coordinates of positions in vector of acceptable digits</param>
+/// <param name="vector2D_possibilities">vector of candidates at particular positions</param>
+/// <param name="vector2D_position_indices">coordinates of positions in vector of candidates</param>
 void bubblesort(doublevector& vector2D_possibilities, doublevector& vector2D_position_indices) {
     bool unsorted = true;
     int k = 0;
@@ -233,7 +233,7 @@ void bubblesort(doublevector& vector2D_possibilities, doublevector& vector2D_pos
 }
 
 /// <summary>
-/// during choice of digit for given position the corresponding number is erased here from list of acceptable digits for all other 
+/// during choice of digit for given position the corresponding number is erased here from list of candidates for all other 
 /// positions located in the same row, column and subgrid; after that the components of corresponding 2D-vectors whose size is eliminated
 /// are excluded
 /// </summary>
@@ -241,8 +241,8 @@ void bubblesort(doublevector& vector2D_possibilities, doublevector& vector2D_pos
 /// <param name="i">coordinates of the row (from 0)</param>
 /// <param name="j">coordinates of the column (from 0)</param>
 /// <param name="tested_layout">investigated layout of numbers</param>
-/// <param name="vector2D_possibilities">vector of acceptable digits at particular positions</param>
-/// <param name="vector2D_position_indices">coordinates of positions in vector of acceptable digits</param>
+/// <param name="vector2D_possibilities">vector of candidates at particular positions</param>
+/// <param name="vector2D_position_indices">coordinates of positions in vector of candidates</param>
 void adjust_acceptable_values(int q, int i, int j, doublevector& vector2D_possibilities, doublevector& vector2D_position_indices) {
     doublevector site_possibilities = {};
     doublevector site_indices = {};
@@ -253,7 +253,7 @@ void adjust_acceptable_values(int q, int i, int j, doublevector& vector2D_possib
 
         bool site_contribution = true;
 
-        // is the number q located in list of acceptable digits for iterated position?
+        // is the number q located in list of candidates for iterated position?
         if (find(vector2D_possibilities[k].begin(), vector2D_possibilities[k].end(), q) != vector2D_possibilities[k].end()) {
 
             // if yes we verify if the iterated position shares with specified position row, column or subgrid
@@ -299,12 +299,12 @@ void adjust_acceptable_values(int q, int i, int j, doublevector& vector2D_possib
 }
 
 /// <summary>
-/// next improvement: for the purpose of simplification on the base of found acceptable digits we search possible positions which
+/// next improvement: for the purpose of simplification on the base of found candidates we search possible positions which
 /// are the only admitting location of some digits within given row, column or subgrid (so-called hidden single)
 /// </summary>
 /// <param name="layout">investigated number layout</param>
-/// <param name="vector2D_possibilities">vector of acceptable digits at particular positions</param>
-/// <param name="vector2D_position_indices">coordinates of positions in vector of acceptable digits</param>
+/// <param name="vector2D_possibilities">vector of candidates at particular positions</param>
+/// <param name="vector2D_position_indices">coordinates of positions in vector of candidates</param>
 void find_hidden_singles(int layout[maximal_value][maximal_value], doublevector& vector2D_possibilities,
     doublevector& vector2D_position_indices) {
 
@@ -336,29 +336,29 @@ void find_hidden_singles(int layout[maximal_value][maximal_value], doublevector&
 }
 
 /// <summary>
-/// main iteration: for improvement of calculation, initially, the 2D-vectors of acceptable digits are ordered by size; next, the
+/// main iteration: for improvement of calculation, initially, the 2D-vectors of candidates are ordered by size; next, the
 /// function chooses the digit for filling the actual position and controls if for given choice some components corresponding to 
-/// not yet filled positions from the vector of acceptable digits are not erased (which means that for actual choice of filling the
+/// not yet filled positions from the vector of candidates are not erased (which means that for actual choice of filling the
 ///  remaining positions the task has no solution); if yes, we choose another digit (which undergoes the same control mechanism),
 /// if no, we first find possible hidden singles and if this does not corrupt the favorable case, the given digit layout is together 
-/// with vector of acceptable digits (reduced by currently selected digit) added to alternates (this serves for the case that given
-/// choice will not finally appear suitable in any of next iterations); if, finally, all acceptable digits corresponding to given 
+/// with vector of candidates (reduced by currently selected digit) added to alternates (this serves for the case that given
+/// choice will not finally appear suitable in any of next iterations); if, finally, all candidates corresponding to given 
 /// position will not appear suitable we choose from alternates the last case when the digit was for any of the previous positions
 /// chosen from more possibilities and we choose the combination of parameters for next iteration together with layout of digits and
 /// vector of acceptable possibilities corresponding to this previous situation
 /// </summary>
 /// <param name="tested_layout">investigated layout of digits</param>
-/// <param name="vector2D_possibilities">vector of acceptable digits at particular positions</param>
-/// <param name="vector2D_position_indices">coordinates of positions in vector of acceptable digits</param>
+/// <param name="vector2D_possibilities">vector of candidates at particular positions</param>
+/// <param name="vector2D_position_indices">coordinates of positions in vector of candidates</param>
 /// <param name="size_of_relevant_alternatives">number of positions admitting alternating combinations of parameters for the case when we achieve the contradiction</param>
 /// <param name="previous_tested_layout">layouts of digits corresponding to alternates</param>
-/// <param name="previous_acceptable_values">acceptable digits corresponding to alternates</param>
+/// <param name="previous_acceptable_values">candidates corresponding to alternates</param>
 /// <param name="previous_indices_order">coordinates to positions corresponding to alternates</param>
 void main_iteration(int tested_layout[maximal_value][maximal_value], doublevector& vector2D_possibilities, doublevector& vector2D_position_indices,
     int& size_of_relevant_alternatives, int previous_tested_layout[maximal_value * maximal_value][maximal_value][maximal_value],
     vector<doublevector>& previous_acceptable_values, vector<doublevector>& previous_indices_order) {
 
-    // sorting the vectors of acceptable digits according to the size
+    // sorting the vectors of candidates according to the size
     bubblesort(vector2D_possibilities, vector2D_position_indices);
 
     // choice of position and digit
@@ -383,7 +383,7 @@ void main_iteration(int tested_layout[maximal_value][maximal_value], doublevecto
 
     // number of yet unfilled positions was reduced by 1 and this should correspond to size of vector with list of acceptable values for
     // all yet unfilled positions; but in case that this reduction was larger then, at the same time, for another of yet unfilled positions
-    // all acceptable digits disappeared and, so, our last choice should be modified
+    // all candidates disappeared and, so, our last choice should be modified
     while (size(new_acceptable_values) < missing_values_count - 1) {
 
         // for given position, we erase the possibility which showed to be unsuitable
@@ -399,7 +399,7 @@ void main_iteration(int tested_layout[maximal_value][maximal_value], doublevecto
             else it++;
         }
 
-        // if for given position all possibilities for acceptable digits were not exhausted we choose the next one; otherwise, we stop
+        // if for given position all possibilities for candidates were not exhausted we choose the next one; otherwise, we stop
         // the cycle - it is necessary to return to closest position which admits choice of another digit
         if (size(vector2D_possibilities[0]) > 0) {
             newQ = vector2D_possibilities[0][0];
@@ -436,7 +436,7 @@ void main_iteration(int tested_layout[maximal_value][maximal_value], doublevecto
     else {
 
         // suitable configuration of parameters found: if it is not the last acceptable digit for given position, we erase from the list
-        // of the corresponding acceptable digits the actual value and the created combination of parameters we save into the list of
+        // of the corresponding candidates the actual value and the created combination of parameters we save into the list of
         // alternates
         if (size(vector2D_possibilities[0]) > 1) {
             doublevector previous_vector = vector2D_possibilities;
@@ -453,7 +453,7 @@ void main_iteration(int tested_layout[maximal_value][maximal_value], doublevecto
         memcpy(tested_layout, new_tested_layout, maximal_value * maximal_value * sizeof(int));
     }
 
-    // in the case of finding the correct combination, the vector of acceptable digits at particular positions was changed, so, we 
+    // in the case of finding the correct combination, the vector of candidates at particular positions was changed, so, we 
     // save into it the newly found (and adjusted) scheme 
     vector2D_possibilities = new_acceptable_values;
     vector2D_position_indices = new_indices_order;
@@ -634,7 +634,7 @@ int main() {
         }
     }
 
-    // for the purpose of simplification on the base of found acceptable digits we find possible positions which are the only admitting
+    // for the purpose of simplification on the base of found candidates we find possible positions which are the only admitting
     // placement of some digits within given row, column or subgrid
     find_hidden_singles(supplied_layout, acceptable_values, indices_order);
 
